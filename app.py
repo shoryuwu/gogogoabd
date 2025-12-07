@@ -150,15 +150,47 @@ st.markdown("""
 # Initialize Supabase
 @st.cache_resource
 def init_supabase():
-    # Load from .env file (prioritas utama)
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_ANON_KEY")
+    """
+    Initialize Supabase client using secrets from st.secrets (Streamlit Cloud)
+    or environment variables (local development)
+    """
+    # Try to get from st.secrets first (Streamlit Cloud)
+    try:
+        url = st.secrets.get("SUPABASE_URL")
+        key = st.secrets.get("SUPABASE_ANON_KEY")
+    except:
+        url = None
+        key = None
     
-    # Fallback hardcoded jika masih None
+    # Fallback to environment variables (local development with .env)
     if not url:
-        url = "https://leyohmljepfigqgguwhc.supabase.co"
+        url = os.getenv("SUPABASE_URL")
     if not key:
-        key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxleW9obWxqZXBmaWdxZ2d1d2hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0NTM5ODIsImV4cCI6MjA4MDAyOTk4Mn0.yuwg-Q-1H9gsqgczYXUOSC-0SqShNPsQa_jwzj-ALLw"
+        key = os.getenv("SUPABASE_ANON_KEY")
+    
+    # Validate that we have the required credentials
+    if not url or not key:
+        st.error("""
+        ❌ **Missing Supabase Credentials!**
+        
+        Please set up your Supabase credentials:
+        
+        **For Local Development:**
+        - Create `.env` file with:
+          ```
+          SUPABASE_URL=your_url_here
+          SUPABASE_ANON_KEY=your_key_here
+          ```
+        
+        **For Streamlit Cloud:**
+        - Go to your app settings
+        - Add secrets in the "Secrets" section:
+          ```
+          SUPABASE_URL = "your_url_here"
+          SUPABASE_ANON_KEY = "your_key_here"
+          ```
+        """)
+        st.stop()
     
     return create_client(url, key)
 
@@ -770,7 +802,6 @@ elif page == "🌍 Globe Map":
                 st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            st.markdown("### 🌍 Geographic Distribution")
             # Latitude distribution
             fig = px.histogram(sample, x="latitude", nbins=36,
                              color_discrete_sequence=["#ff6b35"],
