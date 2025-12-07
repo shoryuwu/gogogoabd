@@ -8,7 +8,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import os
-import sys
 
 # Load from .env for local, or st.secrets for Streamlit Cloud
 try:
@@ -105,12 +104,6 @@ st.markdown("""
         color: #e0e0ff;
     }
     
-    /* Meteor animation */
-    @keyframes meteor {
-        0% { transform: translateX(-100px) translateY(-100px); opacity: 1; }
-        100% { transform: translateX(100vw) translateY(100vh); opacity: 0; }
-    }
-    
     .meteor-header {
         background: linear-gradient(90deg, #ff6b35, #ff8c5a, #ffad7a);
         -webkit-background-clip: text;
@@ -125,100 +118,29 @@ st.markdown("""
         from { text-shadow: 0 0 10px #ff6b35, 0 0 20px #ff6b35; }
         to { text-shadow: 0 0 20px #ff8c5a, 0 0 30px #ff8c5a, 0 0 40px #ffad7a; }
     }
-    
-    /* Stars background effect */
-    .stars {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        background-image: 
-            radial-gradient(2px 2px at 20px 30px, white, transparent),
-            radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
-            radial-gradient(1px 1px at 90px 40px, white, transparent),
-            radial-gradient(2px 2px at 160px 120px, rgba(255,255,255,0.9), transparent);
-        background-repeat: repeat;
-        background-size: 200px 200px;
-        opacity: 0.3;
-        z-index: -1;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize Supabase with better error handling
+# Initialize Supabase
 @st.cache_resource
 def init_supabase():
-    """
-    Initialize Supabase client using secrets from st.secrets (Streamlit Cloud)
-    or environment variables (local development)
-    """
-    try:
-        from supabase import create_client
-    except ImportError:
-        st.error("❌ Supabase library not installed. Please check requirements.txt")
-        st.stop()
+    """Initialize Supabase client"""
+    from supabase import create_client
     
-    # Try to get from st.secrets first (Streamlit Cloud)
-    url = None
-    key = None
+    # Get credentials from st.secrets or environment
+    url = st.secrets.get("SUPABASE_URL") if "SUPABASE_URL" in st.secrets else os.getenv("SUPABASE_URL")
+    key = st.secrets.get("SUPABASE_ANON_KEY") if "SUPABASE_ANON_KEY" in st.secrets else os.getenv("SUPABASE_ANON_KEY")
     
-    try:
-        url = st.secrets.get("SUPABASE_URL")
-        key = st.secrets.get("SUPABASE_ANON_KEY")
-    except Exception as e:
-        st.warning(f"Could not read from st.secrets: {str(e)}")
-    
-    # Fallback to environment variables (local development with .env)
-    if not url:
-        url = os.getenv("SUPABASE_URL")
-    if not key:
-        key = os.getenv("SUPABASE_ANON_KEY")
-    
-    # Validate that we have the required credentials
     if not url or not key:
-        st.error("""
-        ❌ **Missing Supabase Credentials!**
-        
-        Please set up your Supabase credentials:
-        
-        **For Local Development:**
-        - Create `.streamlit/secrets.toml` with:
-          ```
-          SUPABASE_URL = "your_url_here"
-          SUPABASE_ANON_KEY = "your_key_here"
-          ```
-        
-        **For Streamlit Cloud:**
-        - Go to your app settings
-        - Click "Secrets" tab
-        - Add:
-          ```
-          SUPABASE_URL = "your_url_here"
-          SUPABASE_ANON_KEY = "your_key_here"
-          ```
-        """)
+        st.error("❌ Missing Supabase credentials! Check your secrets.")
         st.stop()
     
     try:
-        client = create_client(url, key)
-        return client
+        return create_client(url, key)
     except Exception as e:
-        st.error(f"""
-        ❌ **Failed to connect to Supabase!**
-        
-        Error: {str(e)}
-        
-        Please check:
-        1. Supabase URL is correct (should start with https://)
-        2. Anon Key is valid and not expired
-        3. Supabase project is active
-        4. Network connection is working
-        """)
+        st.error(f"❌ Failed to connect to Supabase: {str(e)}")
         st.stop()
 
-# Initialize Supabase
 supabase = init_supabase()
 
 @st.cache_data(ttl=300)
@@ -230,20 +152,17 @@ def fetch_data(table_name, limit=None):
         response = query.execute()
         return pd.DataFrame(response.data) if response.data else pd.DataFrame()
     except Exception as e:
-        st.warning(f"⚠️ Could not fetch {table_name}: {str(e)}")
+        st.warning(f"⚠️ Could not fetch {table_name}")
         return pd.DataFrame()
 
 @st.cache_data(ttl=300)
 def get_table_count(table_name):
-    """Get total count of records in a table"""
     try:
         response = supabase.table(table_name).select("*", count="exact").execute()
         return response.count if response.count else 0
-    except Exception as e:
-        st.warning(f"⚠️ Could not count {table_name}: {str(e)}")
+    except:
         return 0
 
-# Plotly theme for meteor
 def apply_meteor_theme(fig):
     fig.update_layout(
         paper_bgcolor='rgba(26, 26, 58, 0.8)',
@@ -259,13 +178,7 @@ def apply_meteor_theme(fig):
 
 # Sidebar
 st.sidebar.markdown("""
-<h1 style='text-align: center; 
-           color: #ff6b35; 
-           font-size: 1.8rem; 
-           font-weight: bold; 
-           margin-top: -20px;
-           margin-bottom: 10px;
-           text-shadow: 0 0 10px rgba(255, 107, 53, 0.5);'>
+<h1 style='text-align: center; color: #ff6b35; font-size: 1.8rem; font-weight: bold;'>
     ☄️☄️☄️<br>METEORITE<br>EXPLORER
 </h1>
 """, unsafe_allow_html=True)
@@ -282,7 +195,6 @@ st.sidebar.markdown("### 🛸 Quick Stats")
 meteorites_count = get_table_count("meteorites")
 st.sidebar.metric("Total Meteorites", f"{meteorites_count:,}")
 
-
 # ============================================================================
 # PAGE: HOME
 # ============================================================================
@@ -298,25 +210,20 @@ if page == "🏠 Home":
     
     st.markdown("---")
     
-    # Animated metrics
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        meteorites_total = get_table_count("meteorites")
-        st.metric("☄️ Meteorites", f"{meteorites_total:,}")
+        st.metric("☄️ Meteorites", f"{get_table_count('meteorites'):,}")
     with col2:
         st.metric("🔬 Classifications", len(classifications))
     with col3:
         st.metric("🏛️ Museums", len(museums))
     with col4:
-        specimens_total = get_table_count("meteorite_specimens")
-        st.metric("💎 Specimens", f"{specimens_total:,}")
+        st.metric("💎 Specimens", f"{get_table_count('meteorite_specimens'):,}")
     with col5:
-        studies_total = get_table_count("research_studies")
-        st.metric("📚 Studies", f"{studies_total:,}")
+        st.metric("📚 Studies", f"{get_table_count('research_studies'):,}")
     
     st.markdown("---")
     
-    # Main charts
     col1, col2 = st.columns(2)
     
     with col1:
@@ -326,14 +233,11 @@ if page == "🏠 Home":
             if "category" in merged.columns:
                 cat_counts = merged["category"].dropna().value_counts().reset_index()
                 cat_counts.columns = ["Category", "Count"]
-                cat_counts["Category"] = cat_counts["Category"].fillna("Unknown")
                 fig = px.pie(cat_counts, values="Count", names="Category", hole=0.5,
                            color_discrete_sequence=px.colors.sequential.Oranges_r)
                 fig = apply_meteor_theme(fig)
                 fig.update_traces(textfont_color='white', textinfo='percent+label')
                 st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("📊 No data available for meteorite categories")
     
     with col2:
         st.markdown("### 🔥 Fall vs Found")
@@ -343,16 +247,12 @@ if page == "🏠 Home":
             if "fall_type_name" in merged.columns:
                 fall_counts = merged["fall_type_name"].dropna().value_counts().reset_index()
                 fall_counts.columns = ["Type", "Count"]
-                fall_counts["Type"] = fall_counts["Type"].fillna("Unknown")
                 fig = px.pie(fall_counts, values="Count", names="Type", hole=0.5,
                            color_discrete_sequence=["#ff6b35", "#4ecdc4"])
                 fig = apply_meteor_theme(fig)
                 fig.update_traces(textfont_color='white', textinfo='percent+label')
                 st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("📊 No data available for fall types")
     
-    # Timeline
     st.markdown("### 📅 Discovery Timeline")
     if not meteorites.empty and "year_discovered" in meteorites.columns:
         yearly = meteorites[meteorites["year_discovered"] > 1800].groupby("year_discovered").size().reset_index(name="count")
@@ -365,16 +265,9 @@ if page == "🏠 Home":
                 fillcolor='rgba(255, 107, 53, 0.3)'
             ))
             fig = apply_meteor_theme(fig)
-            fig.update_layout(
-                xaxis_title="Year",
-                yaxis_title="Discoveries",
-                height=400
-            )
+            fig.update_layout(xaxis_title="Year", yaxis_title="Discoveries", height=400)
             st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("📊 No timeline data available")
     
-    # Mass stats
     st.markdown("### ⚖️ Mass Statistics")
     if not meteorites.empty and "mass_gram" in meteorites.columns:
         valid_mass = meteorites[meteorites["mass_gram"].notna() & (meteorites["mass_gram"] > 0)]
@@ -388,8 +281,6 @@ if page == "🏠 Home":
                 st.metric("🏆 Largest", f"{valid_mass['mass_gram'].max() / 1000:,.0f} kg")
             with col4:
                 st.metric("🔬 Smallest", f"{valid_mass['mass_gram'].min():.4f} g")
-        else:
-            st.info("⚖️ No mass data available")
 
 # ============================================================================
 # PAGE: METEORITES
@@ -401,10 +292,7 @@ elif page == "☄️ Meteorites":
     classifications = fetch_data("meteorite_classifications")
     fall_types = fetch_data("fall_types")
     
-    if meteorites.empty:
-        st.error("❌ Could not load meteorites data")
-    else:
-        # Filters in sidebar
+    if not meteorites.empty:
         st.sidebar.markdown("### 🎯 Filters")
         
         selected_cat = "All"
@@ -420,7 +308,6 @@ elif page == "☄️ Meteorites":
         
         year_range = st.sidebar.slider("Year Range", 800, 2023, (1900, 2023))
         
-        # Apply filters
         filtered = meteorites.copy()
         if "year_discovered" in filtered.columns:
             filtered = filtered[(filtered["year_discovered"] >= year_range[0]) & 
@@ -479,17 +366,9 @@ elif page == "☄️ Meteorites":
                     ))
                     
                     fig = apply_meteor_theme(fig)
-                    fig.update_layout(
-                        yaxis_title="Mass (gram) - Log Scale",
-                        yaxis_type="log",
-                        showlegend=False,
-                        height=350
-                    )
+                    fig.update_layout(yaxis_title="Mass (gram) - Log Scale", yaxis_type="log", showlegend=False, height=350)
                     st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("⚠️ Tidak ada data massa")
         
-        # Top heaviest
         st.markdown("### 🏆 Top 15 Heaviest Meteorites")
         if not filtered.empty and "mass_gram" in filtered.columns:
             top15 = filtered.nlargest(15, "mass_gram")[["name", "mass_gram", "year_discovered"]]
@@ -502,12 +381,10 @@ elif page == "☄️ Meteorites":
                 fig.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True)
         
-        # Data table
         st.markdown("### 📋 Data Table")
         if not filtered.empty:
             display_df = filtered[["name", "mass_gram", "year_discovered"]].head(100)
             st.dataframe(display_df, use_container_width=True, height=400)
-
 
 # ============================================================================
 # PAGE: CLASSIFICATIONS
@@ -549,15 +426,12 @@ elif page == "🔬 Classifications":
             fig = apply_meteor_theme(fig)
             st.plotly_chart(fig, use_container_width=True)
         
-        # Treemap
         st.markdown("### 🗺️ Classification Hierarchy")
         fig = px.treemap(classifications, path=['category', 'class_group'], 
                         color_discrete_sequence=px.colors.sequential.Oranges)
         fig = apply_meteor_theme(fig)
         fig.update_layout(height=500)
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.error("❌ Could not load classifications data")
 
 # ============================================================================
 # PAGE: MUSEUMS
@@ -573,8 +447,7 @@ elif page == "🏛️ Museums":
         with col1:
             st.metric("🏛️ Museums", len(museums))
         with col2:
-            specimens_total = get_table_count("meteorite_specimens")
-            st.metric("💎 Specimens", f"{specimens_total:,}")
+            st.metric("💎 Specimens", f"{get_table_count('meteorite_specimens'):,}")
         with col3:
             if not specimens.empty and "specimen_mass_gram" in specimens.columns:
                 total = specimens["specimen_mass_gram"].sum()
@@ -606,14 +479,11 @@ elif page == "🏛️ Museums":
                 fig.update_traces(textfont_color='white')
                 st.plotly_chart(fig, use_container_width=True)
         
-        # Museum cards
         st.markdown("### 🏛️ Museum Directory")
         for _, museum in museums.iterrows():
             with st.expander(f"🏛️ {museum['museum_name']}"):
                 st.write(f"📍 **City:** {museum.get('city', 'N/A')}")
                 st.write(f"📝 **Description:** {museum.get('description', 'N/A')}")
-    else:
-        st.error("❌ Could not load museums data")
 
 # ============================================================================
 # PAGE: RESEARCH
@@ -627,8 +497,7 @@ elif page == "📚 Research":
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        studies_total = get_table_count("research_studies")
-        st.metric("📚 Studies", f"{studies_total:,}")
+        st.metric("📚 Studies", f"{get_table_count('research_studies'):,}")
     with col2:
         st.metric("👨‍🔬 Researchers", len(researchers))
     with col3:
@@ -664,7 +533,6 @@ elif page == "📚 Research":
                 fig = apply_meteor_theme(fig)
                 st.plotly_chart(fig, use_container_width=True)
         
-        # Top journals
         st.markdown("### 📰 Top Journals")
         if "journal" in studies.columns:
             journal_counts = studies["journal"].value_counts().reset_index()
@@ -674,7 +542,6 @@ elif page == "📚 Research":
             fig = apply_meteor_theme(fig)
             st.plotly_chart(fig, use_container_width=True)
     
-    # Researchers
     st.markdown("### 👨‍🔬 Research Team")
     if not researchers.empty:
         cols = st.columns(3)
@@ -690,9 +557,8 @@ elif page == "📚 Research":
                 </div>
                 """, unsafe_allow_html=True)
 
-
 # ============================================================================
-# PAGE: GLOBE MAP (3D Interactive)
+# PAGE: GLOBE MAP
 # ============================================================================
 elif page == "🌍 Globe Map":
     st.markdown("# 🌍 Interactive Globe Map")
@@ -716,8 +582,7 @@ elif page == "🌍 Globe Map":
                     min_value=100, 
                     max_value=min(5000, total_available),
                     value=min(1000, total_available),
-                    step=100,
-                    help="Pilih berapa banyak lokasi meteorit yang ingin ditampilkan di globe."
+                    step=100
                 )
             with col2:
                 st.metric("Menampilkan", f"{sample_size:,}")
@@ -737,13 +602,7 @@ elif page == "🌍 Globe Map":
                 lambda x: str(int(x)) if pd.notna(x) else "Unknown"
             )
             
-            customdata = sample_display[[
-                'name', 
-                'mass_display', 
-                'year_display',
-                'latitude',
-                'longitude'
-            ]].values
+            customdata = sample_display[['name', 'mass_display', 'year_display', 'latitude', 'longitude']].values
             
             fig = go.Figure()
             fig.add_trace(go.Scattergeo(
@@ -753,12 +612,9 @@ elif page == "🌍 Globe Map":
                 customdata=customdata,
                 hovertemplate=(
                     "<b style='font-size:16px; color:#ff6b35;'>☄️ %{customdata[0]}</b><br>"
-                    "<br>"
                     "⚖️ <b>Massa:</b> %{customdata[1]}<br>"
                     "📅 <b>Tahun:</b> %{customdata[2]}<br>"
-                    "📍 <b>Koordinat:</b><br>"
-                    "   Lat: %{customdata[3]:.2f}°<br>"
-                    "   Lon: %{customdata[4]:.2f}°"
+                    "📍 <b>Lat:</b> %{customdata[3]:.2f}° <b>Lon:</b> %{customdata[4]:.2f}°"
                     "<extra></extra>"
                 ),
                 mode='text',
@@ -773,17 +629,12 @@ elif page == "🌍 Globe Map":
                     landcolor='rgb(40, 40, 80)',
                     showocean=True,
                     oceancolor='rgb(20, 20, 50)',
-                    showlakes=True,
-                    lakecolor='rgb(30, 30, 60)',
                     showcountries=True,
                     countrycolor='rgb(100, 100, 150)',
-                    showcoastlines=True,
-                    coastlinecolor='rgb(80, 80, 120)',
                     bgcolor='rgba(10, 10, 26, 1)',
                     projection_rotation=dict(lon=0, lat=20, roll=0)
                 ),
                 paper_bgcolor='rgba(10, 10, 26, 1)',
-                plot_bgcolor='rgba(10, 10, 26, 1)',
                 height=700,
                 margin=dict(l=0, r=0, t=0, b=0)
             )
@@ -795,87 +646,6 @@ elif page == "🌍 Globe Map":
             🖱️ <b>Drag to rotate</b> | 🔍 <b>Scroll to zoom</b> | 👆 <b>Hover ☄️ untuk detail</b>
             </p>
             """, unsafe_allow_html=True)
-            
-            st.markdown("---")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("### 🏔️ By Terrain Type")
-                if "terrain_type" in locations.columns:
-                    terrain_counts = locations["terrain_type"].value_counts().reset_index()
-                    terrain_counts.columns = ["Terrain", "Count"]
-                    fig = px.bar(terrain_counts, x="Count", y="Terrain", orientation='h',
-                               color="Count", color_continuous_scale="Oranges")
-                    fig = apply_meteor_theme(fig)
-                    st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                st.markdown("### 📊 Latitude Distribution")
-                fig = px.histogram(sample, x="latitude", nbins=36,
-                                 color_discrete_sequence=["#ff6b35"],
-                                 labels={"latitude": "Latitude"})
-                fig = apply_meteor_theme(fig)
-                fig.update_layout(title="Latitude Distribution")
-                st.plotly_chart(fig, use_container_width=True)
-            
-            st.markdown("### 🔥 Density Heatmap")
-            
-            col_heat1, col_heat2, col_heat3 = st.columns([2, 2, 2])
-            with col_heat1:
-                heatmap_mode = st.radio(
-                    "📊 Mode Heatmap:",
-                    ["🔢 Berdasarkan Jumlah", "⚖️ Berdasarkan Massa"],
-                    help="Jumlah = semua meteorit sama intensitasnya | Massa = meteorit besar lebih terang"
-                )
-            with col_heat2:
-                radius_heat = st.slider("🎯 Radius Titik", 5, 50, 25, step=5)
-            with col_heat3:
-                zoom_heat = st.slider("🔍 Zoom Level", 0, 3, 1)
-            
-            if heatmap_mode == "🔢 Berdasarkan Jumlah":
-                z_values = [1] * len(sample)
-                colorscale_heat = 'Hot'
-            else:
-                import numpy as np
-                mass_values = sample["mass_gram"].fillna(1).values
-                z_values = np.log10(mass_values + 1)
-                colorscale_heat = 'Plasma'
-            
-            fig = go.Figure(go.Densitymapbox(
-                lat=sample["latitude"],
-                lon=sample["longitude"],
-                z=z_values,
-                radius=radius_heat,
-                colorscale=colorscale_heat,
-                showscale=True,
-                colorbar=dict(
-                    title="Intensitas" if heatmap_mode == "🔢 Berdasarkan Jumlah" else "Log(Mass)",
-                    titlefont=dict(color='#d0d0ff'),
-                    tickfont=dict(color='#d0d0ff')
-                )
-            ))
-            
-            fig.update_layout(
-                mapbox=dict(
-                    style='carto-darkmatter',
-                    center=dict(lat=20, lon=0),
-                    zoom=zoom_heat
-                ),
-                height=600,
-                margin=dict(l=0, r=0, t=0, b=0),
-                paper_bgcolor='rgba(10, 10, 26, 1)'
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-            if heatmap_mode == "🔢 Berdasarkan Jumlah":
-                st.info("💡 **Mode Jumlah**: Semua meteorit memiliki intensitas yang sama. Area dengan banyak meteorit akan terlihat lebih terang.")
-            else:
-                st.info("💡 **Mode Massa**: Meteorit dengan massa lebih besar akan terlihat lebih terang (skala logaritmik).")
-        else:
-            st.error("❌ No location data available with valid coordinates")
-    else:
-        st.error("❌ Could not load locations or meteorites data")
 
 # ============================================================================
 # FOOTER
