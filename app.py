@@ -399,32 +399,25 @@ elif page == "☄️ Meteorites":
                 with col_c:
                     st.metric("🏆 Terberat", f"{valid_mass['mass_gram'].max()/1000:,.0f} kg")
                 
-                # Histogram - lebih familiar dan mudah dipahami
-                # Konversi ke kg untuk lebih mudah dibaca
-                mass_kg = valid_mass['mass_gram'] / 1000
-                
-                fig = px.histogram(
-                    mass_kg, 
-                    x=mass_kg,
-                    nbins=30,
-                    labels={'x': 'Massa (kg)', 'count': 'Jumlah Meteorit'},
-                    color_discrete_sequence=['#ff6b35']
-                )
+                # Box plot dengan log scale - lebih jelas menunjukkan distribusi
+                fig = go.Figure()
+                fig.add_trace(go.Box(
+                    y=valid_mass['mass_gram'],
+                    name='Mass Distribution',
+                    marker=dict(color='#ff6b35'),
+                    boxmean='sd',  # Tampilkan mean dan std deviation
+                    fillcolor='rgba(255, 107, 53, 0.5)',
+                    line=dict(color='#ff6b35', width=2)
+                ))
                 
                 fig = apply_meteor_theme(fig)
                 fig.update_layout(
-                    xaxis_title="Massa (kg)",
-                    yaxis_title="Jumlah Meteorit",
+                    yaxis_title="Mass (gram) - Log Scale",
+                    yaxis_type="log",
                     showlegend=False,
-                    height=350,
-                    bargap=0.1
+                    height=350
                 )
-                fig.update_traces(marker=dict(
-                    line=dict(color='#ff8c5a', width=1)
-                ))
                 st.plotly_chart(fig, use_container_width=True)
-                
-                st.info("💡 **Histogram**: Menampilkan jumlah meteorit dalam setiap rentang massa. Semakin tinggi batang, semakin banyak meteorit dengan massa tersebut.")
             else:
                 st.warning("⚠️ Tidak ada data massa")
     
