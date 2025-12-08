@@ -8,7 +8,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import os
-import numpy as np
 
 # Load from .env for local
 try:
@@ -85,28 +84,8 @@ st.markdown("""
         border-color: #ff6b35;
     }
     
-    .stSelectbox > div > div > div {
-        color: #ff6b35 !important;
-    }
-    
-    .stSelectbox [data-testid="stSelectboxOption"] {
-        color: #ff6b35 !important;
-    }
-    
     .stRadio > div {
         background: transparent;
-    }
-    
-    .stSlider > div > div > div {
-        color: #ff6b35 !important;
-    }
-    
-    .stSlider [role="slider"] {
-        background-color: #ff6b35 !important;
-    }
-    
-    .stSlider > div > div > div > div {
-        color: #ff6b35 !important;
     }
     
     .stAlert {
@@ -127,7 +106,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================================
-# LAZY LOAD SUPABASE
+# LAZY LOAD SUPABASE - Initialize only when needed
 # ============================================================================
 @st.cache_resource
 def get_supabase():
@@ -143,7 +122,7 @@ def get_supabase():
         
         return create_client(url, key)
     except Exception as e:
-        st.error(f"Failed to initialize Supabase: {str(e)}")
+        st.error(f"❌ Failed to initialize Supabase: {str(e)}")
         return None
 
 @st.cache_data(ttl=300)
@@ -160,7 +139,7 @@ def fetch_data(table_name, limit=None):
         response = query.execute()
         return pd.DataFrame(response.data) if response.data else pd.DataFrame()
     except Exception as e:
-        st.warning(f"Could not fetch {table_name}")
+        st.warning(f"⚠️ Could not fetch {table_name}: {str(e)}")
         return pd.DataFrame()
 
 @st.cache_data(ttl=300)
@@ -259,7 +238,7 @@ if page == "🏠 Home":
                     fig.update_traces(textfont_color='white', textinfo='percent+label')
                     st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
-                st.info("No data available")
+                st.info("📊 No data available")
     
     with col2:
         st.markdown("### 🔥 Fall vs Found")
@@ -276,7 +255,51 @@ if page == "🏠 Home":
                     fig.update_traces(textfont_color='white', textinfo='percent+label')
                     st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
-                st.info("No data available")
+                st.info("📊 No data available")
+    
+    # DIAGRAM 1: Name Types Distribution (HOME PAGE)
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 🏷️ Name Type Status")
+        name_types = fetch_data("name_types")
+        if not meteorites.empty and not name_types.empty:
+            try:
+                merged = meteorites.merge(name_types, on="name_type_id", how="left")
+                if "name_type_name" in merged.columns:
+                    name_counts = merged["name_type_name"].dropna().value_counts().reset_index()
+                    name_counts.columns = ["Name Type", "Count"]
+                    fig = px.pie(name_counts, values="Count", names="Name Type", hole=0.5,
+                               color_discrete_sequence=["#9b59b6", "#e74c3c"])
+                    fig = apply_meteor_theme(fig)
+                    fig.update_traces(textfont_color='white', textinfo='percent+label')
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Info box
+                    st.info("ℹ️ **Valid**: Meteorit yang masih diakui | **Relict**: Objek yang telah berubah akibat pelapukan")
+            except Exception as e:
+                st.info("📊 No data available")
+    
+    with col2:
+        st.markdown("### 📊 Name Type by Category")
+        if not meteorites.empty and not name_types.empty and not classifications.empty:
+            try:
+                merged = meteorites.merge(name_types, on="name_type_id", how="left")
+                merged = merged.merge(classifications, on="classification_id", how="left")
+                if "name_type_name" in merged.columns and "category" in merged.columns:
+                    pivot_data = merged.groupby(["category", "name_type_name"]).size().reset_index(name="count")
+                    fig = px.bar(pivot_data, x="category", y="count", color="name_type_name",
+                               barmode="group",
+                               color_discrete_sequence=["#9b59b6", "#e74c3c"],
+                               labels={"count": "Jumlah", "category": "Kategori", "name_type_name": "Name Type"})
+                    fig = apply_meteor_theme(fig)
+                    fig.update_layout(xaxis_tickangle=-45, height=350)
+                    st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.info("📊 No data available")
+    
+    st.markdown("---")
     
     st.markdown("### 📅 Discovery Timeline")
     if not meteorites.empty and "year_discovered" in meteorites.columns:
@@ -406,6 +429,75 @@ elif page == "☄️ Meteorites":
                 except:
                     pass
         
+        # DIAGRAM 2: Name Type Analysis in Meteorites Page
+        st.markdown("---")
+        st.markdown("### 🏷️ Name Type Analysis")
+        
+        name_types = fetch_data("name_types")
+        if not filtered.empty and not name_types.empty:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### 📊 Distribution by Name Type")
+                try:
+                    merged_names = filtered.merge(name_types, on="name_type_id", how="left")
+                    if "name_type_name" in merged_names.columns:
+                        name_dist = merged_names["name_type_name"].dropna().value_counts().reset_index()
+                        name_dist.columns = ["Name Type", "Count"]
+                        
+                        fig = px.bar(name_dist, x="Name Type", y="Count", 
+                                   color="Name Type",
+                                   color_discrete_map={"Valid": "#9b59b6", "Relict": "#e74c3c"},
+                                   text="Count")
+                        fig = apply_meteor_theme(fig)
+                        fig.update_traces(texttemplate='%{text:,}', textposition='outside')
+                        fig.update_layout(showlegend=False, height=300)
+                        st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.info("📊 No name type data available")
+            
+            with col2:
+                st.markdown("#### ⚖️ Average Mass by Name Type")
+                try:
+                    merged_names = filtered.merge(name_types, on="name_type_id", how="left")
+                    if "name_type_name" in merged_names.columns and "mass_gram" in merged_names.columns:
+                        mass_by_type = merged_names.groupby("name_type_name")["mass_gram"].agg(['mean', 'median', 'count']).reset_index()
+                        mass_by_type['mean_kg'] = mass_by_type['mean'] / 1000
+                        mass_by_type['median_kg'] = mass_by_type['median'] / 1000
+                        
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(
+                            x=mass_by_type['name_type_name'],
+                            y=mass_by_type['mean_kg'],
+                            name='Mean',
+                            marker_color='#9b59b6',
+                            text=mass_by_type['mean_kg'].round(2),
+                            texttemplate='%{text} kg',
+                            textposition='outside'
+                        ))
+                        fig.add_trace(go.Bar(
+                            x=mass_by_type['name_type_name'],
+                            y=mass_by_type['median_kg'],
+                            name='Median',
+                            marker_color='#e74c3c',
+                            text=mass_by_type['median_kg'].round(2),
+                            texttemplate='%{text} kg',
+                            textposition='outside'
+                        ))
+                        
+                        fig = apply_meteor_theme(fig)
+                        fig.update_layout(
+                            barmode='group',
+                            yaxis_title="Mass (kg)",
+                            xaxis_title="Name Type",
+                            height=300
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.info("📊 No mass comparison data available")
+        
+        st.markdown("---")
+        
         st.markdown("### 🏆 Top 15 Heaviest Meteorites")
         if not filtered.empty and "mass_gram" in filtered.columns:
             try:
@@ -482,7 +574,7 @@ elif page == "🔬 Classifications":
         except:
             st.info("No data available")
     else:
-        st.info("No classification data available")
+        st.info("📊 No classification data available")
 
 # ============================================================================
 # PAGE: MUSEUMS
@@ -545,7 +637,7 @@ elif page == "🏛️ Museums":
                 st.write(f"📍 **City:** {museum.get('city', 'N/A')}")
                 st.write(f"📝 **Description:** {museum.get('description', 'N/A')}")
     else:
-        st.info("No museum data available")
+        st.info("📊 No museum data available")
 
 # ============================================================================
 # PAGE: RESEARCH
@@ -721,99 +813,12 @@ elif page == "🌍 Globe Map":
                 🖱️ <b>Drag to rotate</b> | 🔍 <b>Scroll to zoom</b> | 👆 <b>Hover ☄️ untuk detail</b>
                 </p>
                 """, unsafe_allow_html=True)
-                
-                st.markdown("---")
-                
-                # Statistics by terrain
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown("### 🏔️ By Terrain Type")
-                    if "terrain_type" in locations.columns:
-                        try:
-                            terrain_counts = locations["terrain_type"].value_counts().reset_index()
-                            terrain_counts.columns = ["Terrain", "Count"]
-                            fig = px.bar(terrain_counts, x="Count", y="Terrain", orientation='h',
-                                       color="Count", color_continuous_scale="Oranges")
-                            fig = apply_meteor_theme(fig)
-                            st.plotly_chart(fig, use_container_width=True)
-                        except:
-                            st.info("No terrain data")
-                
-                with col2:
-                    st.markdown("### 🌍 Geographic Distribution")
-                    try:
-                        fig = px.histogram(sample, x="latitude", nbins=36,
-                                         color_discrete_sequence=["#ff6b35"],
-                                         labels={"latitude": "Latitude"})
-                        fig = apply_meteor_theme(fig)
-                        fig.update_layout(title="Latitude Distribution")
-                        st.plotly_chart(fig, use_container_width=True)
-                    except:
-                        st.info("No latitude data")
-                
-                # Heatmap density
-                st.markdown("### 🔥 Density Heatmap")
-                
-                try:
-                    col_heat1, col_heat2, col_heat3 = st.columns([2, 2, 2])
-                    with col_heat1:
-                        heatmap_mode = st.radio(
-                            "📊 Mode Heatmap:",
-                            ["🔢 Berdasarkan Jumlah", "⚖️ Berdasarkan Massa"],
-                            help="Jumlah = semua meteorit sama intensitasnya | Massa = meteorit besar lebih terang"
-                        )
-                    with col_heat2:
-                        radius_heat = st.slider("🎯 Radius Titik", 5, 50, 25, step=5)
-                    with col_heat3:
-                        zoom_heat = st.slider("🔍 Zoom Level", 0, 3, 1)
-                    
-                    if heatmap_mode == "🔢 Berdasarkan Jumlah":
-                        z_values = [1] * len(sample)
-                        colorscale_heat = 'Hot'
-                    else:
-                        mass_values = sample["mass_gram"].fillna(1).values
-                        z_values = np.log10(mass_values + 1)
-                        colorscale_heat = 'Plasma'
-                    
-                    fig = go.Figure(go.Densitymapbox(
-                        lat=sample["latitude"],
-                        lon=sample["longitude"],
-                        z=z_values,
-                        radius=radius_heat,
-                        colorscale=colorscale_heat,
-                        showscale=True,
-                        colorbar=dict(
-                            title="Intensitas" if heatmap_mode == "🔢 Berdasarkan Jumlah" else "Log(Mass)",
-                            titlefont=dict(color='#d0d0ff'),
-                            tickfont=dict(color='#d0d0ff')
-                        )
-                    ))
-                    
-                    fig.update_layout(
-                        mapbox=dict(
-                            style='carto-darkmatter',
-                            center=dict(lat=20, lon=0),
-                            zoom=zoom_heat
-                        ),
-                        height=600,
-                        margin=dict(l=0, r=0, t=0, b=0),
-                        paper_bgcolor='rgba(10, 10, 26, 1)'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    if heatmap_mode == "🔢 Berdasarkan Jumlah":
-                        st.info("💡 **Mode Jumlah**: Semua meteorit memiliki intensitas yang sama. Area dengan banyak meteorit akan terlihat lebih terang.")
-                    else:
-                        st.info("💡 **Mode Massa**: Meteorit dengan massa lebih besar akan terlihat lebih terang (skala logaritmik).")
-                except Exception as e:
-                    st.warning(f"Could not load heatmap: {str(e)}")
             else:
-                st.error("No location data with valid coordinates")
+                st.error("❌ No location data with valid coordinates")
         except Exception as e:
-            st.error(f"Error loading globe map: {str(e)}")
+            st.error(f"❌ Error loading globe map: {str(e)}")
     else:
-        st.error("Could not load locations or meteorites data")
+        st.error("❌ Could not load locations or meteorites data")
 
 # ============================================================================
 # FOOTER
