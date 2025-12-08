@@ -609,54 +609,6 @@ elif page == "📚 Research":
                     """, unsafe_allow_html=True)
         except:
             st.info("No researcher data available")
-    
-    # DIAGRAM METEORITE_DISCOVERIES - Meteorites Found per Expedition
-    st.markdown("---")
-    st.markdown("### 🏕️ Meteorites Found per Expedition")
-    
-    discoveries = fetch_data("meteorite_discoveries")
-    
-    if not discoveries.empty and not expeditions.empty:
-        try:
-            # Gabungkan discoveries dengan expeditions untuk mendapatkan nama ekspedisi
-            disc_exp = discoveries.merge(expeditions, on="expedition_id", how="left")
-            
-            if "expedition_name" in disc_exp.columns:
-                # Hitung jumlah meteorit per ekspedisi
-                exp_counts = disc_exp.groupby("expedition_name").size().reset_index(name="meteorites_found")
-                exp_counts = exp_counts.sort_values("meteorites_found", ascending=True)
-                
-                # Bar chart horizontal
-                fig = px.bar(exp_counts, 
-                           x="meteorites_found", 
-                           y="expedition_name",
-                           orientation='h',
-                           color="meteorites_found",
-                           color_continuous_scale="Reds",
-                           labels={"meteorites_found": "Jumlah Meteorit", "expedition_name": "Ekspedisi"},
-                           text="meteorites_found")
-                
-                fig = apply_meteor_theme(fig)
-                fig.update_traces(texttemplate='%{text}', textposition='outside')
-                fig.update_layout(showlegend=False, height=500)
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Info box
-                total_discovered = len(discoveries)
-                avg_per_exp = total_discovered / len(expeditions) if len(expeditions) > 0 else 0
-                most_productive = exp_counts.iloc[-1]  # Ekspedisi dengan penemuan terbanyak
-                
-                col_a, col_b, col_c = st.columns(3)
-                with col_a:
-                    st.metric("📊 Total Penemuan", f"{total_discovered:,}")
-                with col_b:
-                    st.metric("📈 Rata-rata/Ekspedisi", f"{avg_per_exp:.1f}")
-                with col_c:
-                    st.metric("🏆 Paling Produktif", f"{most_productive['meteorites_found']}")
-                
-                st.info(f"🏕️ Ekspedisi paling produktif: **{most_productive['expedition_name']}** dengan **{most_productive['meteorites_found']}** meteorit ditemukan")
-        except Exception as e:
-            st.warning("⚠️ Data ekspedisi penemuan tidak tersedia")
 
 # ============================================================================
 # PAGE: GLOBE MAP
