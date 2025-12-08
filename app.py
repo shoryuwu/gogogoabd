@@ -257,50 +257,6 @@ if page == "🏠 Home":
             except Exception as e:
                 st.info("📊 No data available")
     
-    # DIAGRAM 1: Name Types Distribution (HOME PAGE)
-    st.markdown("---")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### 🏷️ Name Type Status")
-        name_types = fetch_data("name_types")
-        if not meteorites.empty and not name_types.empty:
-            try:
-                merged = meteorites.merge(name_types, on="name_type_id", how="left")
-                if "name_type_name" in merged.columns:
-                    name_counts = merged["name_type_name"].dropna().value_counts().reset_index()
-                    name_counts.columns = ["Name Type", "Count"]
-                    fig = px.pie(name_counts, values="Count", names="Name Type", hole=0.5,
-                               color_discrete_sequence=["#9b59b6", "#e74c3c"])
-                    fig = apply_meteor_theme(fig)
-                    fig.update_traces(textfont_color='white', textinfo='percent+label')
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Info box
-                    st.info("ℹ️ **Valid**: Meteorit yang masih diakui | **Relict**: Objek yang telah berubah akibat pelapukan")
-            except Exception as e:
-                st.info("📊 No data available")
-    
-    with col2:
-        st.markdown("### 📊 Name Type by Category")
-        if not meteorites.empty and not name_types.empty and not classifications.empty:
-            try:
-                merged = meteorites.merge(name_types, on="name_type_id", how="left")
-                merged = merged.merge(classifications, on="classification_id", how="left")
-                if "name_type_name" in merged.columns and "category" in merged.columns:
-                    pivot_data = merged.groupby(["category", "name_type_name"]).size().reset_index(name="count")
-                    fig = px.bar(pivot_data, x="category", y="count", color="name_type_name",
-                               barmode="group",
-                               color_discrete_sequence=["#9b59b6", "#e74c3c"],
-                               labels={"count": "Jumlah", "category": "Kategori", "name_type_name": "Name Type"})
-                    fig = apply_meteor_theme(fig)
-                    fig.update_layout(xaxis_tickangle=-45, height=350)
-                    st.plotly_chart(fig, use_container_width=True)
-            except Exception as e:
-                st.info("📊 No data available")
-    
-    st.markdown("---")
-    
     st.markdown("### 📅 Discovery Timeline")
     if not meteorites.empty and "year_discovered" in meteorites.columns:
         try:
@@ -428,75 +384,6 @@ elif page == "☄️ Meteorites":
                         st.plotly_chart(fig, use_container_width=True)
                 except:
                     pass
-        
-        # DIAGRAM 2: Name Type Analysis in Meteorites Page
-        st.markdown("---")
-        st.markdown("### 🏷️ Name Type Analysis")
-        
-        name_types = fetch_data("name_types")
-        if not filtered.empty and not name_types.empty:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("#### 📊 Distribution by Name Type")
-                try:
-                    merged_names = filtered.merge(name_types, on="name_type_id", how="left")
-                    if "name_type_name" in merged_names.columns:
-                        name_dist = merged_names["name_type_name"].dropna().value_counts().reset_index()
-                        name_dist.columns = ["Name Type", "Count"]
-                        
-                        fig = px.bar(name_dist, x="Name Type", y="Count", 
-                                   color="Name Type",
-                                   color_discrete_map={"Valid": "#9b59b6", "Relict": "#e74c3c"},
-                                   text="Count")
-                        fig = apply_meteor_theme(fig)
-                        fig.update_traces(texttemplate='%{text:,}', textposition='outside')
-                        fig.update_layout(showlegend=False, height=300)
-                        st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.info("📊 No name type data available")
-            
-            with col2:
-                st.markdown("#### ⚖️ Average Mass by Name Type")
-                try:
-                    merged_names = filtered.merge(name_types, on="name_type_id", how="left")
-                    if "name_type_name" in merged_names.columns and "mass_gram" in merged_names.columns:
-                        mass_by_type = merged_names.groupby("name_type_name")["mass_gram"].agg(['mean', 'median', 'count']).reset_index()
-                        mass_by_type['mean_kg'] = mass_by_type['mean'] / 1000
-                        mass_by_type['median_kg'] = mass_by_type['median'] / 1000
-                        
-                        fig = go.Figure()
-                        fig.add_trace(go.Bar(
-                            x=mass_by_type['name_type_name'],
-                            y=mass_by_type['mean_kg'],
-                            name='Mean',
-                            marker_color='#9b59b6',
-                            text=mass_by_type['mean_kg'].round(2),
-                            texttemplate='%{text} kg',
-                            textposition='outside'
-                        ))
-                        fig.add_trace(go.Bar(
-                            x=mass_by_type['name_type_name'],
-                            y=mass_by_type['median_kg'],
-                            name='Median',
-                            marker_color='#e74c3c',
-                            text=mass_by_type['median_kg'].round(2),
-                            texttemplate='%{text} kg',
-                            textposition='outside'
-                        ))
-                        
-                        fig = apply_meteor_theme(fig)
-                        fig.update_layout(
-                            barmode='group',
-                            yaxis_title="Mass (kg)",
-                            xaxis_title="Name Type",
-                            height=300
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.info("📊 No mass comparison data available")
-        
-        st.markdown("---")
         
         st.markdown("### 🏆 Top 15 Heaviest Meteorites")
         if not filtered.empty and "mass_gram" in filtered.columns:
