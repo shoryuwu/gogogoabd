@@ -564,8 +564,9 @@ elif page == "📚 Research":
     studies = fetch_data("research_studies")
     researchers = fetch_data("researchers")
     expeditions = fetch_data("discovery_expeditions")
+    discoveries = fetch_data("meteorite_discoveries")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         studies_total = get_table_count("research_studies")
         st.metric("📚 Studies", f"{studies_total:,}")
@@ -573,6 +574,9 @@ elif page == "📚 Research":
         st.metric("👨‍🔬 Researchers", len(researchers))
     with col3:
         st.metric("🏕️ Expeditions", len(expeditions))
+    with col4:
+        discoveries_total = get_table_count("meteorite_discoveries")
+        st.metric("🔍 Discoveries", f"{discoveries_total:,}")
     
     st.markdown("---")
     
@@ -612,6 +616,87 @@ elif page == "📚 Research":
                    color="Publications", color_continuous_scale="Oranges")
         fig = apply_meteor_theme(fig)
         st.plotly_chart(fig, use_container_width=True)
+    
+    # ===== BAGIAN BARU: METEORITE DISCOVERIES =====
+    st.markdown("---")
+    st.markdown("## 🔍 Meteorite Discoveries Analysis")
+    st.markdown("##### Analisis Penemuan Meteorit dari Ekspedisi")
+    
+    if not discoveries.empty:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### 🔬 Discovery Methods")
+            if "discovery_method" in discoveries.columns:
+                method_counts = discoveries["discovery_method"].value_counts().reset_index()
+                method_counts.columns = ["Method", "Count"]
+                fig = px.pie(method_counts, values="Count", names="Method", hole=0.4,
+                           color_discrete_sequence=px.colors.sequential.Sunset)
+                fig = apply_meteor_theme(fig)
+                fig.update_traces(textfont_color='white', textinfo='percent+label')
+                st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            st.markdown("### 📍 Find Context")
+            if "find_context" in discoveries.columns:
+                context_counts = discoveries["find_context"].value_counts().reset_index()
+                context_counts.columns = ["Context", "Count"]
+                fig = px.bar(context_counts, x="Count", y="Context", orientation='h',
+                           color="Count", color_continuous_scale="Plasma")
+                fig = apply_meteor_theme(fig)
+                st.plotly_chart(fig, use_container_width=True)
+        
+        # Discovery Timeline
+        st.markdown("### 📅 Discovery Timeline")
+        if "discovery_date" in discoveries.columns:
+            # Convert to datetime and extract year
+            discoveries_timeline = discoveries.copy()
+            discoveries_timeline["discovery_date"] = pd.to_datetime(discoveries_timeline["discovery_date"], errors='coerce')
+            discoveries_timeline["year"] = discoveries_timeline["discovery_date"].dt.year
+            
+            # Filter valid years
+            valid_years = discoveries_timeline[discoveries_timeline["year"].notna()]
+            
+            if not valid_years.empty:
+                yearly_discoveries = valid_years.groupby("year").size().reset_index(name="count")
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=yearly_discoveries["year"], 
+                    y=yearly_discoveries["count"],
+                    mode='lines+markers',
+                    line=dict(color='#4ecdc4', width=3),
+                    marker=dict(size=8, color='#4ecdc4'),
+                    fill='tozeroy',
+                    fillcolor='rgba(78, 205, 196, 0.2)'
+                ))
+                fig = apply_meteor_theme(fig)
+                fig.update_layout(
+                    xaxis_title="Tahun",
+                    yaxis_title="Jumlah Penemuan",
+                    height=350
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        
+        # Discoveries per Expedition
+        st.markdown("### 🏕️ Top Expeditions by Discoveries")
+        if not expeditions.empty:
+            # Merge discoveries with expeditions
+            exp_disc = discoveries.merge(expeditions, on="expedition_id", how="left")
+            if "expedition_name" in exp_disc.columns:
+                exp_counts = exp_disc["expedition_name"].value_counts().head(10).reset_index()
+                exp_counts.columns = ["Expedition", "Discoveries"]
+                
+                fig = px.bar(exp_counts, x="Discoveries", y="Expedition", orientation='h',
+                           color="Discoveries", 
+                           color_continuous_scale="Oranges",
+                           labels={"Expedition": "Nama Ekspedisi", "Discoveries": "Jumlah Penemuan"})
+                fig = apply_meteor_theme(fig)
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("📊 Data meteorite discoveries belum tersedia")
+    
+    st.markdown("---")
     
     # Researchers
     st.markdown("### 👨‍🔬 Research Team")
