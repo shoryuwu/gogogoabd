@@ -387,7 +387,7 @@ elif page == "☄️ Meteorites":
     with col2:
         st.markdown("### ⚖️ Mass Distribution")
         if not filtered.empty and "mass_gram" in filtered.columns:
-            valid_mass = filtered[filtered["mass_gram"].notna() & (filtered["mass_gram"] > 0)]
+            valid_mass = filtered[filtered["mass_gram"].notna() & (filtered["mass_gram"] > 0)].copy()
             
             if len(valid_mass) > 0:
                 # Statistik ringkas
@@ -399,23 +399,57 @@ elif page == "☄️ Meteorites":
                 with col_c:
                     st.metric("🏆 Terberat", f"{valid_mass['mass_gram'].max()/1000:,.0f} kg")
                 
-                # Box plot dengan log scale - lebih jelas menunjukkan distribusi
+                # Kategorisasi massa untuk lebih mudah dipahami
+                def categorize_mass(mass_g):
+                    if mass_g < 100:
+                        return "Sangat Ringan\n(< 100g)"
+                    elif mass_g < 1000:
+                        return "Ringan\n(100g - 1kg)"
+                    elif mass_g < 10000:
+                        return "Sedang\n(1kg - 10kg)"
+                    elif mass_g < 100000:
+                        return "Berat\n(10kg - 100kg)"
+                    else:
+                        return "Sangat Berat\n(> 100kg)"
+                
+                valid_mass['kategori'] = valid_mass['mass_gram'].apply(categorize_mass)
+                
+                # Urutkan kategori
+                category_order = [
+                    "Sangat Ringan\n(< 100g)",
+                    "Ringan\n(100g - 1kg)",
+                    "Sedang\n(1kg - 10kg)",
+                    "Berat\n(10kg - 100kg)",
+                    "Sangat Berat\n(> 100kg)"
+                ]
+                
+                # Hitung jumlah per kategori
+                category_counts = valid_mass['kategori'].value_counts().reindex(category_order, fill_value=0).reset_index()
+                category_counts.columns = ['Kategori', 'Jumlah']
+                
+                # Buat bar chart dengan warna gradasi
+                colors = ['#4ecdc4', '#45b7aa', '#3da58a', '#ff6b35', '#e74c3c']
+                
                 fig = go.Figure()
-                fig.add_trace(go.Box(
-                    y=valid_mass['mass_gram'],
-                    name='Mass Distribution',
-                    marker=dict(color='#ff6b35'),
-                    boxmean='sd',  # Tampilkan mean dan std deviation
-                    fillcolor='rgba(255, 107, 53, 0.5)',
-                    line=dict(color='#ff6b35', width=2)
+                fig.add_trace(go.Bar(
+                    x=category_counts['Kategori'],
+                    y=category_counts['Jumlah'],
+                    marker=dict(
+                        color=colors,
+                        line=dict(color='rgba(255, 255, 255, 0.3)', width=1.5)
+                    ),
+                    text=category_counts['Jumlah'],
+                    textposition='outside',
+                    textfont=dict(size=12, color='#d0d0ff')
                 ))
                 
                 fig = apply_meteor_theme(fig)
                 fig.update_layout(
-                    yaxis_title="Mass (gram) - Log Scale",
-                    yaxis_type="log",
+                    xaxis_title="Kategori Massa",
+                    yaxis_title="Jumlah Meteorit",
                     showlegend=False,
-                    height=350
+                    height=350,
+                    xaxis=dict(tickangle=0)
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
